@@ -20,22 +20,42 @@ services:
 #      - "/dev/bus/usb:/dev/bus/usb"
 #    privileged: true
 
-  stf:
-    container_name: stf
+#  stf:
+#    container_name: stf
+#    image: devicefarmer/stf
+#    ports:
+#      - "7100:7100"
+#      # WebSocket用ポート
+#      - "7110:7110"
+#      # Androidデバイス用ポート
+#      - "7400-7500:7400-7500"
+#    environment:
+#      - TZ='Asia/Tokyo'
+#      # migrate時に環境変数でRethinkDBのURLが必要なため指定
+#      - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
+#    restart: unless-stopped
+#    # adb-hostでhost.docker.internalを指定し、adbコンテナを使わずにローカルインストールされたadbを使う
+#    command: stf local --adb-host host.docker.internal --provider-min-port 7400 --provider-max-port 7500
+
+  app-triproxy:
+    container_name: app-triproxy
     image: devicefarmer/stf
-    ports:
-      - "7100:7100"
-      # WebSocket用ポート
-      - "7110:7110"
-      # Androidデバイス用ポート
-      - "7400-7500:7400-7500"
+    restart: unless-stopped
+    command: stf triproxy app --bind-pub "tcp://*:7111" --bind-dealer "tcp://*:7112" --bind-pull "tcp://*:7113"
+
+  dev-triproxy:
+    container_name: dev-triproxy
+    image: devicefarmer/stf
+    restart: unless-stopped
+    command: stf triproxy dev --bind-pub "tcp://*:7114" --bind-dealer "tcp://*:7115" --bind-pull "tcp://*:7116"
+
+  processor:
+    container_name: processor
+    image: devicefarmer/stf
     environment:
-      - TZ='Asia/Tokyo'
-      # migrate時に環境変数でRethinkDBのURLが必要なため指定
       - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
     restart: unless-stopped
-    # adb-hostでhost.docker.internalを指定し、adbコンテナを使わずにローカルインストールされたadbを使う
-    command: stf local --adb-host host.docker.internal --provider-min-port 7400 --provider-max-port 7500
+    command: stf processor proc --connect-app-dealer tcp://127.0.0.1:7112 --connect-dev-dealer tcp://127.0.0.1:7115
 
 volumes:
   rethinkdb-data: {}
