@@ -52,10 +52,20 @@ services:
   processor:
     container_name: processor
     image: devicefarmer/stf
+    # TODO:rethinddbの起動待ちを入れる
     environment:
       - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
     restart: unless-stopped
     command: stf processor proc --connect-app-dealer tcp://app-triproxy:7112 --connect-dev-dealer tcp://dev-triproxy:7115
+
+  reaper:
+    container_name: reaper
+    image: devicefarmer/stf
+    # TODO:rethinddbの起動待ちを入れる
+    environment:
+      - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
+    restart: unless-stopped
+    command: stf reaper reap --connect-push tcp://dev-triproxy:7116 --connect-sub tcp://app-triproxy:7111
 
 volumes:
   rethinkdb-data: {}
