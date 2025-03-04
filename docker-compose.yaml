@@ -30,56 +30,66 @@ services:
 #      - "/dev/bus/usb:/dev/bus/usb"
 #    privileged: true
 
-  stf:
-    container_name: stf
+#  stf:
+#    container_name: stf
+#    image: devicefarmer/stf
+#    # 依存を設定。rethinkdbが起動してからstfを起動する
+#    depends_on:
+#      rethinkdb:
+#        condition: service_healthy
+#    ports:
+#      - "7100:7100"
+#      # WebSocket用ポート
+#      - "7110:7110"
+#      # Androidデバイス用ポート
+#      - "7400-7500:7400-7500"
+#    environment:
+#      - TZ='Asia/Tokyo'
+#      # migrate時に環境変数でRethinkDBのURLが必要なため指定
+#      - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
+#    restart: unless-stopped
+#    # adb-hostでhost.docker.internalを指定し、adbコンテナを使わずにローカルインストールされたadbを使う
+#    command: stf local --adb-host host.docker.internal --provider-min-port 7400 --provider-max-port 7500
+
+  app-triproxy:
+    container_name: app-triproxy
     image: devicefarmer/stf
-    # 依存を設定。rethinkdbが起動してからstfを起動する
     depends_on:
       rethinkdb:
         condition: service_healthy
-    ports:
-      - "7100:7100"
-      # WebSocket用ポート
-      - "7110:7110"
-      # Androidデバイス用ポート
-      - "7400-7500:7400-7500"
+    restart: unless-stopped
+    command: stf triproxy app --bind-pub "tcp://*:7111" --bind-dealer "tcp://*:7112" --bind-pull "tcp://*:7113"
+
+  dev-triproxy:
+    container_name: dev-triproxy
+    image: devicefarmer/stf
+    depends_on:
+      rethinkdb:
+        condition: service_healthy
+    restart: unless-stopped
+    command: stf triproxy dev --bind-pub "tcp://*:7114" --bind-dealer "tcp://*:7115" --bind-pull "tcp://*:7116"
+
+  processor:
+    container_name: processor
+    image: devicefarmer/stf
+    depends_on:
+      rethinkdb:
+        condition: service_healthy
     environment:
-      - TZ='Asia/Tokyo'
-      # migrate時に環境変数でRethinkDBのURLが必要なため指定
       - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
     restart: unless-stopped
-    # adb-hostでhost.docker.internalを指定し、adbコンテナを使わずにローカルインストールされたadbを使う
-    command: stf local --adb-host host.docker.internal --provider-min-port 7400 --provider-max-port 7500
+    command: stf processor proc --connect-app-dealer tcp://app-triproxy:7112 --connect-dev-dealer tcp://dev-triproxy:7115
 
-#  app-triproxy:
-#    container_name: app-triproxy
-#    image: devicefarmer/stf
-#    restart: unless-stopped
-#    command: stf triproxy app --bind-pub "tcp://*:7111" --bind-dealer "tcp://*:7112" --bind-pull "tcp://*:7113"
-#
-#  dev-triproxy:
-#    container_name: dev-triproxy
-#    image: devicefarmer/stf
-#    restart: unless-stopped
-#    command: stf triproxy dev --bind-pub "tcp://*:7114" --bind-dealer "tcp://*:7115" --bind-pull "tcp://*:7116"
-#
-#  processor:
-#    container_name: processor
-#    image: devicefarmer/stf
-#    # TODO:rethinddbの起動待ちを入れる
-#    environment:
-#      - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
-#    restart: unless-stopped
-#    command: stf processor proc --connect-app-dealer tcp://app-triproxy:7112 --connect-dev-dealer tcp://dev-triproxy:7115
-#
-#  reaper:
-#    container_name: reaper
-#    image: devicefarmer/stf
-#    # TODO:rethinddbの起動待ちを入れる
-#    environment:
-#      - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
-#    restart: unless-stopped
-#    command: stf reaper reap --connect-push tcp://dev-triproxy:7116 --connect-sub tcp://app-triproxy:7111
+  reaper:
+    container_name: reaper
+    image: devicefarmer/stf
+    depends_on:
+      rethinkdb:
+        condition: service_healthy
+    environment:
+      - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
+    restart: unless-stopped
+    command: stf reaper reap --connect-push tcp://dev-triproxy:7116 --connect-sub tcp://app-triproxy:7111
 
 volumes:
   rethinkdb-data: {}
