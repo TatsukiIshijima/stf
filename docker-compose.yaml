@@ -55,7 +55,7 @@ services:
     environment:
       - RETHINKDB_PORT_28015_TCP=tcp://rethinkdb:28015
     restart: unless-stopped
-    command: stf processor proc --connect-app-dealer tcp://127.0.0.1:7112 --connect-dev-dealer tcp://127.0.0.1:7115
+    command: stf processor proc --connect-app-dealer tcp://app-triproxy:7112 --connect-dev-dealer tcp://dev-triproxy:7115
 
 volumes:
   rethinkdb-data: {}
