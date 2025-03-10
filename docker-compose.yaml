@@ -1,6 +1,6 @@
 volumes:
-  rethinkdb: { }
-  storage-temp: { }
+  rethinkdb-data: { }
+  storage-temp-data: { }
 
 services:
 
@@ -24,7 +24,7 @@ services:
     image: rethinkdb:2.4.2
     restart: unless-stopped
     volumes:
-      - rethinkdb:/data
+      - rethinkdb-data:/data
 
   app:
     image: devicefarmer/stf
@@ -161,7 +161,7 @@ services:
       dockerfile: Dockerfile-storage-temp
     restart: unless-stopped
     volumes:
-      - storage-temp:/app/data
+      - storage-temp-data:/app/data
     command: >
       stf storage-temp
         --port 3500
