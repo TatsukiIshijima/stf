@@ -10,7 +10,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "7100:80"
     depends_on:
       - app
       - auth
@@ -26,34 +26,23 @@ services:
     volumes:
       - rethinkdb-data:/data
 
-  app:
+  app-triproxy:
     image: devicefarmer/stf
     restart: unless-stopped
-    environment:
-      - RETHINKDB_PORT_28015_TCP
-      - SECRET
     command: >
-      stf app
-        --auth-url http://${PUBLIC_IP}/auth/mock/
-        --websocket-url ws://${PUBLIC_IP}/
-        --port 3100
-    depends_on:
-      - rethinkdb
-      - auth
-      - websocket
+      stf triproxy app001
+        --bind-pub "tcp://*:7111"
+        --bind-dealer "tcp://*:7112"
+        --bind-pull "tcp://*:7113"
 
-  auth:
+  dev-triproxy:
     image: devicefarmer/stf
     restart: unless-stopped
-    environment:
-      - RETHINKDB_PORT_28015_TCP
-      - SECRET
     command: >
-      stf auth-mock
-        --app-url http://${PUBLIC_IP}/
-        --port 3200
-    depends_on:
-      - rethinkdb
+      stf triproxy dev001
+        --bind-pub "tcp://*:7114"
+        --bind-dealer "tcp://*:7115"
+        --bind-pull "tcp://*:7116"
 
   processor:
     image: devicefarmer/stf
@@ -61,63 +50,13 @@ services:
     environment:
       - RETHINKDB_PORT_28015_TCP
     command: >
-      stf processor
-        --connect-app-dealer tcp://app-triproxy:7160
-        --connect-dev-dealer tcp://dev-triproxy:7260
+      stf processor proc001
+        --connect-app-dealer tcp://app-triproxy:7112
+        --connect-dev-dealer tcp://dev-triproxy:7115
     depends_on:
       - rethinkdb
       - app-triproxy
       - dev-triproxy
-
-  app-triproxy:
-    image: devicefarmer/stf
-    restart: unless-stopped
-    command: >
-      stf triproxy app
-        --bind-pub "tcp://*:7150"
-        --bind-dealer "tcp://*:7160"
-        --bind-pull "tcp://*:7170"
-
-  dev-triproxy:
-    image: devicefarmer/stf
-    restart: unless-stopped
-    command: >
-      stf triproxy dev
-        --bind-pub "tcp://*:7250"
-        --bind-dealer "tcp://*:7260"
-        --bind-pull "tcp://*:7270"
-
-  migrate:
-    image: devicefarmer/stf
-    environment:
-      - RETHINKDB_PORT_28015_TCP
-    command: stf migrate
-    depends_on:
-      - rethinkdb
-
-  provider:
-    image: devicefarmer/stf
-    restart: unless-stopped
-    # ADBはホストマシンのものを使用するため、host.docker.internalを指定
-    command: >
-      stf provider
-        --name provider
-        --connect-sub tcp://dev-triproxy:7250
-        --connect-push tcp://dev-triproxy:7270
-        --storage-url http://${PUBLIC_IP}/
-        --public-ip ${PUBLIC_IP}
-        --heartbeat-interval 10000
-        --screen-ws-url-pattern "ws://${PUBLIC_IP}/d/nuc/<%= serial %>/<%= publicPort %>/"
-        --adb-host host.docker.internal
-        --min-port 7400
-        --max-port 7410
-        --allow-remote
-    ports:
-      - "7400-7410:7400-7410"
-    depends_on:
-      - dev-triproxy
-      - app-triproxy
-      - storage-temp
 
   reaper:
     image: devicefarmer/stf
@@ -130,61 +69,65 @@ services:
       - dev-triproxy
       - app-triproxy
     command: >
-      stf reaper dev
-        --connect-push tcp://dev-triproxy:7270
-        --connect-sub tcp://app-triproxy:7150
-        --heartbeat-timeout 30000
+      stf reaper repear001
+        --connect-push tcp://dev-triproxy:7116
+        --connect-sub tcp://app-triproxy:7111
 
-  storage-plugin-apk:
+  provider:
     image: devicefarmer/stf
     restart: unless-stopped
+    # ADBはホストマシンのものを使用するため、host.docker.internalを指定
     command: >
-      stf storage-plugin-apk
-        --port 3300
-        --storage-url http://${PUBLIC_IP}/
+      stf provider
+        --name provider
+        --min-port 7400
+        --max-port 7410
+        --connect-sub tcp://dev-triproxy:7114
+        --connect-push tcp://dev-triproxy:7116
+        --group-timeout 900
+        --public-ip ${PUBLIC_IP}
+        --storage-url http://${PUBLIC_IP}:7100/
+        --adb-host host.docker.internal
+        --adb-port 5037
+        --vnc-initial-size 600x800
+        --mute-master never
+        --screen-ws-url-pattern "ws://${PUBLIC_IP}:7100"
+        --cleanup-folder
+    ports:
+      - "7400-7410:7400-7410"
     depends_on:
+      - dev-triproxy
+      - app-triproxy
       - storage-temp
 
-  storage-plugin-image:
-    image: devicefarmer/stf
-    restart: unless-stopped
-    command: >
-      stf storage-plugin-image
-        --port 3400
-        --storage-url http://${PUBLIC_IP}/
-    depends_on:
-      - storage-temp
-
-  storage-temp:
-    build:
-      context: .
-      dockerfile: Dockerfile-storage-temp
-    restart: unless-stopped
-    volumes:
-      - storage-temp-data:/app/data
-    command: >
-      stf storage-temp
-        --port 3500
-        --save-dir /app/data
-
-  websocket:
+  auth:
     image: devicefarmer/stf
     restart: unless-stopped
     environment:
-      - SECRET
       - RETHINKDB_PORT_28015_TCP
+      - SECRET
     command: >
-      stf websocket
-        --port 3600
-        --storage-url http://${PUBLIC_IP}/
-        --connect-sub tcp://app-triproxy:7150
-        --connect-push tcp://app-triproxy:7170
+      stf auth-mock
+        --app-url http://${PUBLIC_IP}:7100/
+        --port 7120
     depends_on:
-      - migrate
       - rethinkdb
-      - storage-temp
-      - app-triproxy
-      - dev-triproxy
+
+  app:
+    image: devicefarmer/stf
+    restart: unless-stopped
+    environment:
+      - RETHINKDB_PORT_28015_TCP
+      - SECRET
+    command: >
+      stf app
+        --auth-url http://${PUBLIC_IP}:7100/auth/mock/
+        --websocket-url http://${PUBLIC_IP}:7110/
+        --port 7105
+    depends_on:
+      - rethinkdb
+      - auth
+      - websocket
 
   api:
     image: devicefarmer/stf
@@ -194,11 +137,11 @@ services:
       - RETHINKDB_PORT_28015_TCP
     command: >
       stf api
-        --port 3700
-        --connect-sub tcp://app-triproxy:7150
-        --connect-push tcp://app-triproxy:7170
-        --connect-sub-dev tcp://dev-triproxy:7250
-        --connect-push-dev tcp://dev-triproxy:7270
+        --port 7106
+        --connect-sub tcp://app-triproxy:7111
+        --connect-push tcp://app-triproxy:7113
+        --connect-sub-dev tcp://dev-triproxy:7114
+        --connect-push-dev tcp://dev-triproxy:7116
     depends_on:
       - migrate
       - rethinkdb
@@ -212,10 +155,72 @@ services:
       - RETHINKDB_PORT_28015_TCP
     command: >
       stf groups-engine
-        --connect-push tcp://app-triproxy:7170
-        --connect-sub tcp://app-triproxy:7150
-        --connect-push-dev tcp://dev-triproxy:7270
-        --connect-sub-dev tcp://dev-triproxy:7250
+        --connect-push tcp://app-triproxy:7113
+        --connect-sub tcp://app-triproxy:71111
+        --connect-push-dev tcp://dev-triproxy:7116
+        --connect-sub-dev tcp://dev-triproxy:7114
     depends_on:
       - migrate
+      - rethinkdb
+
+  websocket:
+    image: devicefarmer/stf
+    restart: unless-stopped
+    ports:
+      - "7110:7110"
+    environment:
+      - SECRET
+      - RETHINKDB_PORT_28015_TCP
+    command: >
+      stf websocket
+        --port 7110
+        --storage-url http://${PUBLIC_IP}:7100/
+        --connect-sub tcp://app-triproxy:7111
+        --connect-push tcp://app-triproxy:7113
+    depends_on:
+      - migrate
+      - rethinkdb
+      - storage-temp
+      - app-triproxy
+      - dev-triproxy
+
+  storage-temp:
+    build:
+      context: .
+      dockerfile: Dockerfile-storage-temp
+    restart: unless-stopped
+    volumes:
+      - storage-temp-data:/app/data
+    command: >
+      stf storage-temp
+        --port 7102
+        --save-dir /app/data
+
+
+  storage-plugin-image:
+    image: devicefarmer/stf
+    restart: unless-stopped
+    command: >
+      stf storage-plugin-image
+        --port 7103
+        --storage-url http://${PUBLIC_IP}:7100/
+    depends_on:
+      - storage-temp
+
+  storage-plugin-apk:
+    image: devicefarmer/stf
+    restart: unless-stopped
+    command: >
+      stf storage-plugin-apk
+        --port 7104
+        --storage-url http://${PUBLIC_IP}:7100/
+    depends_on:
+      - storage-temp
+
+  migrate:
+    image: devicefarmer/stf
+    environment:
+      - RETHINKDB_PORT_28015_TCP
+    command: stf migrate
+    depends_on:
       - rethinkdb
