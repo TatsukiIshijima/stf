@@ -91,7 +91,7 @@ services:
         --adb-port 5037
         --vnc-initial-size 600x800
         --mute-master never
-        --screen-ws-url-pattern "ws://${PUBLIC_IP}:7100"
+        --screen-ws-url-pattern "ws://${PUBLIC_IP}:7100/d/nuc/<%= serial %>/<%= publicPort %>/"
         --cleanup-folder
     ports:
       - "7400-7410:7400-7410"
