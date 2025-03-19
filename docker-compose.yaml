@@ -3,6 +3,7 @@ volumes:
   storage-temp-data: { }
 
 services:
+  # stf:latestはDockerfileでビルドしたイメージ
 
   nginx:
     image: nginx:1.27.4
@@ -27,7 +28,7 @@ services:
       - rethinkdb-data:/data
 
   app-triproxy:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     command: >
       stf triproxy app001
@@ -36,7 +37,7 @@ services:
         --bind-pull "tcp://*:7113"
 
   dev-triproxy:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     command: >
       stf triproxy dev001
@@ -45,7 +46,7 @@ services:
         --bind-pull "tcp://*:7116"
 
   processor:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     environment:
       - RETHINKDB_PORT_28015_TCP
@@ -59,7 +60,7 @@ services:
       - dev-triproxy
 
   reaper:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     environment:
       - RETHINKDB_PORT_28015_TCP
@@ -74,7 +75,7 @@ services:
         --connect-sub tcp://app-triproxy:7111
 
   provider:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     # ADBはホストマシンのものを使用するため、host.docker.internalを指定
     command: >
@@ -101,7 +102,7 @@ services:
       - storage-temp
 
   auth:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     environment:
       - RETHINKDB_PORT_28015_TCP
@@ -114,7 +115,7 @@ services:
       - rethinkdb
 
   app:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     environment:
       - RETHINKDB_PORT_28015_TCP
@@ -130,7 +131,7 @@ services:
       - websocket
 
   api:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     environment:
       - SECRET
@@ -148,7 +149,7 @@ services:
       - app-triproxy
 
   groups-engin:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     environment:
       - SECRET
@@ -164,7 +165,7 @@ services:
       - rethinkdb
 
   websocket:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     ports:
       - "7110:7110"
@@ -185,9 +186,7 @@ services:
       - dev-triproxy
 
   storage-temp:
-    build:
-      context: .
-      dockerfile: Dockerfile-storage-temp
+    image: stf:latest
     restart: unless-stopped
     volumes:
       - storage-temp-data:/app/data
@@ -196,9 +195,8 @@ services:
         --port 7102
         --save-dir /app/data
 
-
   storage-plugin-image:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     command: >
       stf storage-plugin-image
@@ -208,7 +206,7 @@ services:
       - storage-temp
 
   storage-plugin-apk:
-    image: devicefarmer/stf
+    image: stf:latest
     restart: unless-stopped
     command: >
       stf storage-plugin-apk
@@ -218,7 +216,7 @@ services:
       - storage-temp
 
   migrate:
-    image: devicefarmer/stf
+    image: stf:latest
     environment:
       - RETHINKDB_PORT_28015_TCP
     command: stf migrate

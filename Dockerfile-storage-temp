@@ -1,9 +1,0 @@
-FROM devicefarmer/stf
-
-USER root
-
-RUN mkdir -p data
-
-RUN chown stf:stf -R data
-
-USER stf

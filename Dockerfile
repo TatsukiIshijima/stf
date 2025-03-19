@@ -71,7 +71,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     rm -rf .npm .cache .config .local && \
     cd /app; \
   fi
-  
+
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
     export DEBIAN_FRONTEND=noninteractive && \
     echo '--- Updating repositories' && \
@@ -127,6 +127,13 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
       .eslintrc .nvmrc .tool-versions res/.eslintrc && \
     rm -rf /tmp/*; \
   fi
+
+# storage-tmp用にディレクトリ作成と権限追加
+USER root
+
+RUN mkdir -p data
+
+RUN chown stf:stf -R data
 
 # Switch to the app user.
 USER stf
